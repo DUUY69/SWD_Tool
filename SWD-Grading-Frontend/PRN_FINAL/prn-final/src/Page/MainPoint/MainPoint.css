@@ -1,0 +1,27 @@
+/* Custom styles for MainPoint component */
+/* Most styling is now handled by Ant Design */
+
+/* Ensure smooth transitions */
+* {
+  transition-property: background-color, border-color, transform;
+  transition-duration: 0.3s;
+  transition-timing-function: ease-in-out;
+}
+
+/* Custom scrollbar for sidebar */
+.ant-layout-sider::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ant-layout-sider::-webkit-scrollbar-track {
+  background: #f0f0f0;
+}
+
+.ant-layout-sider::-webkit-scrollbar-thumb {
+  background: #d9d9d9;
+  border-radius: 3px;
+}
+
+.ant-layout-sider::-webkit-scrollbar-thumb:hover {
+  background: #bfbfbf;
+}

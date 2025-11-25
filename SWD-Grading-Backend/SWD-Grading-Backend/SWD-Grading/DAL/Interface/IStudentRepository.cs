@@ -1,0 +1,16 @@
+using Model.Entity;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace DAL.Interface
+{
+	public interface IStudentRepository : IGenericRepository<Student, long>
+	{
+		Task<Student?> GetByStudentCodeAsync(string studentCode);
+		Task<bool> ExistsByStudentCodeAsync(string studentCode, long? excludeId = null);
+	}
+}
+

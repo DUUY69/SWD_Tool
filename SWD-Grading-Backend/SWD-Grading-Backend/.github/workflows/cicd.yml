@@ -1,0 +1,106 @@
+name: CI/CD SWD Grading Backend
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: PROD
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up .NET 8.0
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        working-directory: SWD-Grading
+        run: dotnet restore SWD-Grading.sln
+
+      - name: Build
+        working-directory: SWD-Grading
+        run: dotnet build SWD-Grading.sln --configuration Release --no-restore
+
+      - name: Docker login
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ vars.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build Docker image
+        working-directory: SWD-Grading
+        run: docker build -t ${{ vars.DOCKER_USERNAME }}/swd-grading-backend:latest -f SWD-Grading/Dockerfile .
+
+      - name: Push Docker image
+        run: docker push ${{ vars.DOCKER_USERNAME }}/swd-grading-backend:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment: PROD
+    steps:
+      - name: SSH to server and deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.HOST_IP }}
+          username: root
+          key: ${{ secrets.SECRET_KEY }}
+          script: |
+            cd ${{ vars.DEPLOY_PATH }}
+            echo "Deploying SWD Grading Backend..."
+            
+            # Clone or update repository for migrations
+            if [ -d "SWD-Grading-Backend" ]; then
+              echo "Updating existing repository..."
+              cd SWD-Grading-Backend
+              git fetch origin
+              git reset --hard origin/${{ github.ref_name }}
+              git pull origin ${{ github.ref_name }}
+              cd ..
+            else
+              echo "Cloning repository..."
+              git clone -b ${{ github.ref_name }} https://github.com/anhtu2808/SWD-Grading-Backend.git SWD-Grading-Backend
+            fi
+            
+            # Pull latest images
+            docker compose pull
+            
+            # Stop and remove old containers
+            docker compose down --remove-orphans || true
+            docker rm -f $(docker ps -a -q --filter "name=swd-grading-backend") || true
+            
+            # Clean up old images
+            docker image prune -f
+            
+            # Start services
+            docker compose up -d
+            
+            # Wait for SQL Server to be ready
+            echo "Waiting for SQL Server to be ready..."
+            sleep 30
+            
+            # Run database migrations
+            echo "Running database migrations..."
+            cd SWD-Grading-Backend/SWD-Grading
+            dotnet ef database update --project DAL --startup-project SWD-Grading || echo "Migration failed, but continuing..."
+            cd ${{ vars.DEPLOY_PATH }}
+            
+            # Clean up dangling images
+            docker rmi $(docker images -q --filter "dangling=true") 2>/dev/null || true
+            
+            # Show running containers
+            echo "Deployment complete. Running containers:"
+            docker ps
+

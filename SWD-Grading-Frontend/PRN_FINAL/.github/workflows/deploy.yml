@@ -1,0 +1,65 @@
+name: CI/CD - Build and Deploy PRN Final
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy PRN Final
+    runs-on: ubuntu-latest
+    environment: PROD
+    
+    defaults:
+      run:
+        working-directory: ./prn-final
+
+    steps:
+    # 1. Checkout code
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # 2. Set up Node.js
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20
+
+    # 3. Create .env file
+    - name: Create .env file
+      run: |
+        echo "VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}" > .env
+
+    # 4. Install dependencies
+    - name: Install Dependencies
+      run: npm ci
+
+    # 5. Build project
+    - name: Build Vite App
+      run: npm run build
+
+    # 6. Deploy to server
+    - name: Deploy PRN Final App
+      env:
+        SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        SERVER_HOST: ${{ vars.SERVER_HOST }}
+        SERVER_USER: ${{ vars.SERVER_USER }}
+        DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      run: |
+        # Thiết lập SSH Key
+        mkdir -p ~/.ssh
+        echo "$SERVER_SSH_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts
+
+        # Backup và xóa nội dung cũ, sau đó upload nội dung mới
+        ssh $SERVER_USER@$SERVER_HOST "rm -rf $DEPLOY_PATH/*"
+        scp -r dist/* $SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/
+        
+        # Set proper permissions
+        ssh $SERVER_USER@$SERVER_HOST "chown -R www-data:www-data $DEPLOY_PATH && chmod -R 755 $DEPLOY_PATH"
+
+        # Reload Nginx
+        ssh $SERVER_USER@$SERVER_HOST "sudo systemctl reload nginx"
+

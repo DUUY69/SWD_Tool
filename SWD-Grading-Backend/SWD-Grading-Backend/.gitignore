@@ -1,0 +1,228 @@
+## ============================
+##  .gitignore for .NET & VS
+##  Optimized for: .NET 6/7/8+
+## ============================
+
+# Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]uild[Ll]og.*
+*.tlog
+*.tmp
+*.tmp_proj
+*.log
+*.binlog
+*.scc
+
+# Visual Studio
+.vs/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.sln.docstates
+*.suo
+*.user
+*.userosscache
+*.rsuser
+*.userprefs
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.VisualState.xml
+TestResult.xml
+nunit-*.xml
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# Code coverage tools
+*.coverage
+*.coveragexml
+.axoCover/*
+!.axoCover/settings.json
+*.dotCover
+_NCrunch_*
+.*crunch*.local.xml
+nCrunchTemp_*
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+
+# Artifacts / Scaffolding
+artifacts/
+ScaffoldingReadMe.txt
+
+# ASP.NET / Blazor
+wwwroot/node_modules/
+node_modules/
+dist/
+publish/
+AppPackages/
+BundleArtifacts/
+*.appx
+*.appxbundle
+*.appxupload
+*.azurePubxml
+*.publishproj
+PublishScripts/
+*.pubxml
+*.Publish.xml
+
+# Environment
+.env
+.env.*
+*.development.json
+*.secrets.json
+appsettings.*.local.json
+
+# Configuration / Secrets
+*.pfx
+*.publishsettings
+*.key
+*.snk
+
+# Entity Framework
+Migrations/obj/
+*.dbmdl
+*.mdf
+*.ldf
+*.ndf
+
+# Logs & Temp files
+*.pidb
+*.svclog
+*.psess
+*.vsp
+*.vspx
+*.sap
+*.e2e
+*.tmp
+*.bak
+*.orig
+*.swp
+*.swo
+*.cache
+*.cachefile
+~$*
+*~
+
+# IDE / Tools
+_ReSharper*/
+*.DotSettings.user
+_TeamCity*
+*.tss
+*.cr/personal
+*.jmconfig
+.mfractor/
+.localhistory/
+.vshistory/
+.ionide/
+.idea/
+*.sln.iml
+*.code-workspace
+.history/
+MigrationBackup/
+FodyWeavers.xsd
+mono_crash.*
+
+# Frontend assets (if combined with React/Angular)
+/ClientApp/node_modules/
+/ClientApp/build/
+/ClientApp/dist/
+/ClientApp/.env
+/wwwroot/dist/
+/wwwroot/uploads/
+/wwwroot/temp/
+
+# Azure / Publish
+csx/
+ecf/
+rcf/
+*.build.csdef
+
+# SQL Server / Reports
+*.rdl.data
+*.rptproj.bak
+*.rdl.data
+*.rptproj.rsuser
+*.bim.layout
+*.bim_*.settings
+*.mdf
+*.ldf
+*.ndf
+
+# Python / Misc
+__pycache__/
+*.pyc
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# OS generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+desktop.ini
+
+# Lock files
+project.lock.json
+project.fragment.lock.json
+global.json
+
+# Temporary folders
+temp/
+tmp/
+.cache/
+logs/
+
+# Optional local configs
+*.local.json
+*.config.local
+
+# Others
+*.bak
+*.orig
+*.rej
+*.rej.*
+*.rej-*
+*.rej~
+*.rej.bak
+
+# Ignore build folders in submodules
+**/bin/
+**/obj/
+
+# Keep README and scripts in root
+!README.md
+!*.ps1
+!*.sh
+*.sln
+
+**/appsettings.json
+SWD-Grading/SWD-Grading/appsettings.json
+.clinerules/byterover-rules.md
+.kilocode/rules/byterover-rules.md
+.roo/rules/byterover-rules.md
+.windsurf/rules/byterover-rules.md
+.cursor/rules/byterover-rules.mdc
+.kiro/steering/byterover-rules.md
+.qoder/rules/byterover-rules.md
+.augment/rules/byterover-rules.md
