@@ -17,7 +17,7 @@
   },
   "FileUpload": {
     "MaxFileSizeMB": 500,
-    "AllowedExtensions": [".zip"],
+    "AllowedExtensions": [".zip", ".rar"],
     "TempStoragePath": "temp/uploads"
   },
   "Qdrant": {

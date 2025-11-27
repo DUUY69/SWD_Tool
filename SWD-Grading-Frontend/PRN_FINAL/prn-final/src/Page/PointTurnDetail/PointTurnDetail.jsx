@@ -731,7 +731,7 @@ const PointTurnDetail = () => {
                           className="d-none"
                           id="file-input"
                           onChange={handleFileChange}
-                          accept=".zip"
+                          accept=".zip,.rar"
                           disabled={!excelUploaded}
                         />
                         <div className="mb-0" style={{ cursor: excelUploaded ? "pointer" : "not-allowed" }}>

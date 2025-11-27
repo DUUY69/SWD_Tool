@@ -515,15 +515,49 @@ const MainPoint = () => {
     return null;
   };
 
+  const buildDrivePreviewUrl = (rawUrl) => {
+    if (!rawUrl) return "";
+    try {
+      const parsed = new URL(rawUrl);
+      const isDrive =
+        parsed.hostname.includes("drive.google.com") ||
+        parsed.hostname.includes("docs.google.com");
+      if (!isDrive) return rawUrl;
+
+      if (parsed.pathname.includes("/preview")) {
+        return parsed.toString();
+      }
+
+      if (parsed.pathname.includes("/view")) {
+        parsed.pathname = parsed.pathname.replace("/view", "/preview");
+        return parsed.toString();
+      }
+
+      const resourceKey = parsed.searchParams.get("resourcekey");
+      const fileId = extractGoogleFileId(rawUrl);
+      if (fileId) {
+        let previewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+        if (resourceKey) {
+          previewUrl += `?resourcekey=${resourceKey}`;
+        }
+        return previewUrl;
+      }
+
+      return rawUrl;
+    } catch (error) {
+      const fallbackId = extractGoogleFileId(rawUrl);
+      if (fallbackId) {
+        return `https://drive.google.com/file/d/${fallbackId}/preview`;
+      }
+      return rawUrl;
+    }
+  };
+
   const getOfficeViewerUrl = (url) => {
     if (!url) return "";
 
     if (url.includes("docs.google.com") || url.includes("drive.google.com")) {
-      const fileId = extractGoogleFileId(url);
-      if (fileId) {
-        return `https://drive.google.com/file/d/${fileId}/preview`;
-      }
-      return url;
+      return buildDrivePreviewUrl(url);
     }
 
     const encodedUrl = encodeURIComponent(url);
@@ -537,14 +571,16 @@ const MainPoint = () => {
     }
 
     const fileId = extractGoogleFileId(url);
+    const iframeUrl = buildDrivePreviewUrl(url);
+
     if (!fileId) {
-      return { isDrive: false, imageUrl: url, iframeUrl: "" };
+      return { isDrive: true, imageUrl: url, iframeUrl };
     }
 
     return {
       isDrive: true,
-      imageUrl: `https://drive.google.com/uc?export=view&id=${fileId}`,
-      iframeUrl: `https://drive.google.com/file/d/${fileId}/preview`
+      imageUrl: `https://drive.google.com/thumbnail?id=${fileId}&sz=w2000`,
+      iframeUrl
     };
   };
 

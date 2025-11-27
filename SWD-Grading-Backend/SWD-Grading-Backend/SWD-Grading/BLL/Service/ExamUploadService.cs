@@ -42,9 +42,9 @@ namespace BLL.Service
 
 			// Check file extension
 			var extension = Path.GetExtension(zipFile.FileName).ToLower();
-			if (extension != ".zip")
+			if (extension != ".zip" && extension != ".rar")
 			{
-				throw new ArgumentException($"File type {extension} is not allowed. Only .zip files are accepted.");
+				throw new ArgumentException($"File type {extension} is not allowed. Only .zip and .rar files are accepted.");
 			}
 
 			// Check file size
@@ -75,8 +75,8 @@ namespace BLL.Service
 				Directory.CreateDirectory(tempStoragePath);
 			}
 
-			// Save ZIP file temporarily
-			var fileName = $"{examCode}_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid()}.zip";
+			// Save archive file temporarily (keep original extension)
+			var fileName = $"{examCode}_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid()}{extension}";
 			var zipFilePath = Path.Combine(tempStoragePath, fileName);
 
 			using (var stream = new FileStream(zipFilePath, FileMode.Create))

@@ -57,6 +57,7 @@ services:
       # File Upload Configuration
       - FileUpload__MaxFileSizeMB=${FILE_UPLOAD_MAX_SIZE_MB}
       - FileUpload__AllowedExtensions__0=.zip
+      - FileUpload__AllowedExtensions__1=.rar
       - FileUpload__TempStoragePath=${FILE_UPLOAD_TEMP_PATH}
       # Qdrant Configuration
       - Qdrant__Endpoint=http://qdrant-db:6333

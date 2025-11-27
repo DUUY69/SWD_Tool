@@ -11,6 +11,11 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using SharpCompress.Archives;
+using SharpCompress.Common;
+using iText.Kernel.Pdf;
+using iText.Kernel.Pdf.Canvas.Parser;
+using iText.Kernel.Pdf.Canvas.Parser.Listener;
 
 namespace BLL.Service
 {
@@ -66,8 +71,16 @@ namespace BLL.Service
 
 				try
 				{
-					// Extract main ZIP file
-					ZipFile.ExtractToDirectory(examZip.ZipPath, tempExtractPath);
+					// Extract main archive file (ZIP or RAR)
+					var archiveExtension = Path.GetExtension(examZip.ZipPath).ToLower();
+					if (archiveExtension == ".rar")
+					{
+						ExtractRarFile(examZip.ZipPath, tempExtractPath);
+					}
+					else
+					{
+						ZipFile.ExtractToDirectory(examZip.ZipPath, tempExtractPath);
+					}
 					examZip.ExtractedPath = tempExtractPath;
 
 					// Find Student_Solutions folder (it might be at root or inside another folder)
@@ -211,16 +224,23 @@ namespace BLL.Service
 		// Get or create Student folder inside Solutions folder
 		var (studentFolderId, _) = await _driveService.GetOrCreateFolderAsync(studentCode, exam.DriveSolutionsFolderId);
 
-		// Check for .docx files directly in folder "0" first
+		// Check for document files directly in folder "0" first (.docx, .doc, .pdf)
 		var existingDocxFiles = Directory.GetFiles(zeroFolderPath, "*.docx", SearchOption.TopDirectoryOnly)
 			.Where(f => !Path.GetFileName(f).StartsWith("~$")) // Exclude temp Word files
 			.ToList();
+		var existingDocFiles = Directory.GetFiles(zeroFolderPath, "*.doc", SearchOption.TopDirectoryOnly)
+			.Where(f => !Path.GetFileName(f).StartsWith("~$"))
+			.ToList();
+		var existingPdfFiles = Directory.GetFiles(zeroFolderPath, "*.pdf", SearchOption.TopDirectoryOnly)
+			.ToList();
 
-		// Check for solution.zip
+		// Check for solution.zip or solution.rar
 		var solutionZipPath = Path.Combine(zeroFolderPath, "solution.zip");
+		var solutionRarPath = Path.Combine(zeroFolderPath, "solution.rar");
 		var hasSolutionZip = File.Exists(solutionZipPath);
+		var hasSolutionRar = File.Exists(solutionRarPath);
 
-		// Upload solution.zip to Drive if exists
+		// Upload solution.zip or solution.rar to Drive if exists
 		string? solutionZipDriveFileId = null;
 		if (hasSolutionZip)
 		{
@@ -230,75 +250,159 @@ namespace BLL.Service
 				solutionZipDriveFileId = fileId;
 			}
 		}
+		else if (hasSolutionRar)
+		{
+			using (var rarFileStream = File.OpenRead(solutionRarPath))
+			{
+				var (fileId, webViewLink) = await _driveService.UploadFileAsync(rarFileStream, "solution.rar", studentFolderId);
+				solutionZipDriveFileId = fileId;
+			}
+		}
 
-			List<string> allWordFiles = new List<string>();
+			List<string> allDocumentFiles = new List<string>();
 
-			// Add existing .docx files from folder 0
-			allWordFiles.AddRange(existingDocxFiles);
+			// Add existing files from folder 0
+			allDocumentFiles.AddRange(existingDocxFiles);
+			allDocumentFiles.AddRange(existingDocFiles);
+			allDocumentFiles.AddRange(existingPdfFiles);
 
-			// Extract solution.zip if exists to find more .docx files
-			if (hasSolutionZip)
+			// Extract solution.zip or solution.rar if exists to find more files
+			if (hasSolutionZip || hasSolutionRar)
 			{
 				var tempSolutionExtractPath = Path.Combine(Path.GetTempPath(), $"solution_{Guid.NewGuid()}");
 				Directory.CreateDirectory(tempSolutionExtractPath);
 
 				try
 				{
-					ZipFile.ExtractToDirectory(solutionZipPath, tempSolutionExtractPath);
+					if (hasSolutionZip)
+					{
+						ZipFile.ExtractToDirectory(solutionZipPath, tempSolutionExtractPath);
+					}
+					else if (hasSolutionRar)
+					{
+						ExtractRarFile(solutionRarPath, tempSolutionExtractPath);
+					}
 
-					// Find all .docx files in extracted ZIP
-					var wordFilesInZip = Directory.GetFiles(tempSolutionExtractPath, "*.docx", SearchOption.AllDirectories)
+					// Find all document files in extracted archive (.docx, .doc, .pdf)
+					var docxFilesInArchive = Directory.GetFiles(tempSolutionExtractPath, "*.docx", SearchOption.AllDirectories)
 						.Where(f => !Path.GetFileName(f).StartsWith("~$"))
 						.ToList();
+					var docFilesInArchive = Directory.GetFiles(tempSolutionExtractPath, "*.doc", SearchOption.AllDirectories)
+						.Where(f => !Path.GetFileName(f).StartsWith("~$"))
+						.ToList();
+					var pdfFilesInArchive = Directory.GetFiles(tempSolutionExtractPath, "*.pdf", SearchOption.AllDirectories)
+						.ToList();
 
-					allWordFiles.AddRange(wordFilesInZip);
+					allDocumentFiles.AddRange(docxFilesInArchive);
+					allDocumentFiles.AddRange(docFilesInArchive);
+					allDocumentFiles.AddRange(pdfFilesInArchive);
+
+					// Check for nested archives (ZIP or RAR inside the extracted archive)
+					var nestedZips = Directory.GetFiles(tempSolutionExtractPath, "*.zip", SearchOption.AllDirectories).ToList();
+					var nestedRars = Directory.GetFiles(tempSolutionExtractPath, "*.rar", SearchOption.AllDirectories).ToList();
+
+					foreach (var nestedZip in nestedZips)
+					{
+						var nestedExtractPath = Path.Combine(tempSolutionExtractPath, $"nested_{Guid.NewGuid()}");
+						Directory.CreateDirectory(nestedExtractPath);
+						try
+						{
+							ZipFile.ExtractToDirectory(nestedZip, nestedExtractPath);
+							var nestedDocs = Directory.GetFiles(nestedExtractPath, "*.docx", SearchOption.AllDirectories)
+								.Concat(Directory.GetFiles(nestedExtractPath, "*.doc", SearchOption.AllDirectories))
+								.Concat(Directory.GetFiles(nestedExtractPath, "*.pdf", SearchOption.AllDirectories))
+								.Where(f => !Path.GetFileName(f).StartsWith("~$"))
+								.ToList();
+							allDocumentFiles.AddRange(nestedDocs);
+						}
+						catch (Exception ex)
+						{
+							Console.WriteLine($"Error extracting nested ZIP {nestedZip}: {ex.Message}");
+						}
+					}
+
+					foreach (var nestedRar in nestedRars)
+					{
+						var nestedExtractPath = Path.Combine(tempSolutionExtractPath, $"nested_{Guid.NewGuid()}");
+						Directory.CreateDirectory(nestedExtractPath);
+						try
+						{
+							ExtractRarFile(nestedRar, nestedExtractPath);
+							var nestedDocs = Directory.GetFiles(nestedExtractPath, "*.docx", SearchOption.AllDirectories)
+								.Concat(Directory.GetFiles(nestedExtractPath, "*.doc", SearchOption.AllDirectories))
+								.Concat(Directory.GetFiles(nestedExtractPath, "*.pdf", SearchOption.AllDirectories))
+								.Where(f => !Path.GetFileName(f).StartsWith("~$"))
+								.ToList();
+							allDocumentFiles.AddRange(nestedDocs);
+						}
+						catch (Exception ex)
+						{
+							Console.WriteLine($"Error extracting nested RAR {nestedRar}: {ex.Message}");
+						}
+					}
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine($"Error extracting solution.zip: {ex.Message}");
+					Console.WriteLine($"Error extracting solution archive: {ex.Message}");
 				}
 			}
 
-		// Process all Word files found
-		if (allWordFiles.Count == 0)
+		// Process all document files found
+		if (allDocumentFiles.Count == 0)
 		{
-			// No Word files found - throw error to be caught by outer try-catch
-			var errorMsg = hasSolutionZip 
-				? "No .docx files found in folder '0' or solution.zip" 
-				: "solution.zip not found and no .docx files in folder '0'";
+			// No document files found - throw error to be caught by outer try-catch
+			var errorMsg = (hasSolutionZip || hasSolutionRar)
+				? "No document files (.docx, .doc, .pdf) found in folder '0' or solution archive" 
+				: "Solution archive not found and no document files in folder '0'";
 			throw new Exception(errorMsg);
 		}
 
-		// Process each Word file
-		foreach (var wordFilePath in allWordFiles)
+		// Process each document file
+		foreach (var documentFilePath in allDocumentFiles)
 		{
-			var fileName = Path.GetFileName(wordFilePath);
+			var fileName = Path.GetFileName(documentFilePath);
+			var fileExtension = Path.GetExtension(documentFilePath).ToLower();
 
-			// Upload Word file to Drive
+			// Upload document file to Drive
 			string driveFileId;
 			string driveWebViewLink;
-			using (var wordFileStream = File.OpenRead(wordFilePath))
+			using (var documentFileStream = File.OpenRead(documentFilePath))
 			{
-				var (fileId, webViewLink) = await _driveService.UploadFileAsync(wordFileStream, fileName, studentFolderId);
+				var (fileId, webViewLink) = await _driveService.UploadFileAsync(documentFileStream, fileName, studentFolderId);
 				driveFileId = fileId;
 				driveWebViewLink = webViewLink;
 			}
 
-			// Extract text from Word document
+			// Extract text from document based on file type
 			string? extractedText = null;
 			string? parseMessage = null;
 			DocParseStatus parseStatus;
 
 			try
 			{
-				extractedText = ExtractTextFromWord(wordFilePath);
+				if (fileExtension == ".docx")
+				{
+					extractedText = ExtractTextFromWord(documentFilePath);
+				}
+				else if (fileExtension == ".doc")
+				{
+					extractedText = ExtractTextFromDoc(documentFilePath);
+				}
+				else if (fileExtension == ".pdf")
+				{
+					extractedText = ExtractTextFromPdf(documentFilePath);
+				}
+				else
+				{
+					throw new NotSupportedException($"Unsupported file type: {fileExtension}");
+				}
 				parseStatus = DocParseStatus.OK;
 				parseMessage = "Successfully parsed";
 			}
 			catch (Exception ex)
 			{
 				parseStatus = DocParseStatus.ERROR;
-				parseMessage = $"Error parsing Word document: {ex.Message}";
+				parseMessage = $"Error parsing document: {ex.Message}";
 			}
 
 			// Create DocFile record
@@ -319,7 +423,7 @@ namespace BLL.Service
 
 		// Update ExamStudent status to PARSED
 		examStudent.Status = ExamStudentStatus.PARSED;
-		examStudent.Note = $"Processed {allWordFiles.Count} Word file(s)";
+		examStudent.Note = $"Processed {allDocumentFiles.Count} document file(s)";
 
 		await _unitOfWork.SaveChangesAsync();
 		}
@@ -369,6 +473,75 @@ namespace BLL.Service
 			{
 				throw new Exception($"Failed to extract text from Word document: {ex.Message}", ex);
 			}
+		}
+
+		private void ExtractRarFile(string rarFilePath, string extractPath)
+		{
+			try
+			{
+				using (var archive = ArchiveFactory.Open(rarFilePath))
+				{
+					foreach (var entry in archive.Entries)
+					{
+						if (!entry.IsDirectory)
+						{
+							var entryPath = Path.Combine(extractPath, entry.Key);
+							var entryDir = Path.GetDirectoryName(entryPath);
+							if (!string.IsNullOrEmpty(entryDir) && !Directory.Exists(entryDir))
+							{
+								Directory.CreateDirectory(entryDir);
+							}
+							using (var entryStream = entry.OpenEntryStream())
+							using (var fileStream = File.Create(entryPath))
+							{
+								entryStream.CopyTo(fileStream);
+							}
+						}
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				throw new Exception($"Failed to extract RAR file: {ex.Message}", ex);
+			}
+		}
+
+		public string ExtractTextFromPdf(string pdfFilePath)
+		{
+			try
+			{
+				var text = new StringBuilder();
+				using (var pdfReader = new PdfReader(pdfFilePath))
+				using (var pdfDocument = new PdfDocument(pdfReader))
+				{
+					var numberOfPages = pdfDocument.GetNumberOfPages();
+					
+					for (int pageNum = 1; pageNum <= numberOfPages; pageNum++)
+					{
+						var page = pdfDocument.GetPage(pageNum);
+						var strategy = new LocationTextExtractionStrategy();
+						var pageText = PdfTextExtractor.GetTextFromPage(page, strategy);
+						
+						if (!string.IsNullOrWhiteSpace(pageText))
+						{
+							text.AppendLine(pageText);
+						}
+					}
+				}
+				return text.ToString();
+			}
+			catch (Exception ex)
+			{
+				throw new Exception($"Failed to extract text from PDF: {ex.Message}", ex);
+			}
+		}
+
+		public string ExtractTextFromDoc(string docFilePath)
+		{
+			// Note: Word 97 (.doc) parsing requires NPOI.HWPF which is not available for .NET 8.0
+			// For now, we'll return a placeholder message indicating the file was uploaded but not parsed
+			// In the future, consider using Aspose.Words or another library that supports .doc files on .NET 8.0
+			throw new NotSupportedException("Word 97 (.doc) file parsing is not currently supported. The file has been uploaded to Google Drive but text extraction is not available. Please convert the file to .docx format for text extraction.");
 		}
 	}
 }

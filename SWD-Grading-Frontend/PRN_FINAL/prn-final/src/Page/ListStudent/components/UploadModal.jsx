@@ -237,7 +237,7 @@ const ZipPanel = (props) => {
       <FileDragger
         file={file}
         fileName={fileName}
-        accept=".zip"
+        accept=".zip,.rar"
         onFileSelect={onFileSelect}
         onRemove={onRemove}
         disabled={loading || isPolling || !canUpload}

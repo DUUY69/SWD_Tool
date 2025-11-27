@@ -32,23 +32,58 @@ const PlagiarismDetail = () => {
     }
   }, [pairData, navigate]);
 
+  const extractGoogleId = (input) => {
+    if (!input) return null;
+    const directMatch = input.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (directMatch) return directMatch[1];
+    const idParam = input.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (idParam) return idParam[1];
+    return null;
+  };
+
+  const buildDrivePreviewUrl = (rawUrl) => {
+    if (!rawUrl) return "";
+    try {
+      const parsed = new URL(rawUrl);
+      const isDrive =
+        parsed.hostname.includes("drive.google.com") ||
+        parsed.hostname.includes("docs.google.com");
+      if (!isDrive) return rawUrl;
+
+      if (parsed.pathname.includes("/preview")) {
+        return parsed.toString();
+      }
+
+      if (parsed.pathname.includes("/view")) {
+        parsed.pathname = parsed.pathname.replace("/view", "/preview");
+        return parsed.toString();
+      }
+
+      const resourceKey = parsed.searchParams.get("resourcekey");
+      const fileId = extractGoogleId(rawUrl);
+      if (fileId) {
+        let previewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+        if (resourceKey) {
+          previewUrl += `?resourcekey=${resourceKey}`;
+        }
+        return previewUrl;
+      }
+
+      return rawUrl;
+    } catch (error) {
+      const fallbackId = extractGoogleId(rawUrl);
+      if (fallbackId) {
+        return `https://drive.google.com/file/d/${fallbackId}/preview`;
+      }
+      return rawUrl;
+    }
+  };
+
   const getOfficeViewerUrl = (url) => {
     if (!url) return "";
 
-    const extractGoogleId = (input) => {
-      const directMatch = input.match(/\/d\/([a-zA-Z0-9_-]+)/);
-      if (directMatch) return directMatch[1];
-      const idParam = input.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-      if (idParam) return idParam[1];
-      return null;
-    };
-
     if (url.includes("docs.google.com") || url.includes("drive.google.com")) {
-      const fileId = extractGoogleId(url);
-      if (fileId) {
-        return `https://drive.google.com/file/d/${fileId}/preview`;
-      }
-      return url;
+      return buildDrivePreviewUrl(url);
     }
 
     const encodedUrl = encodeURIComponent(url);

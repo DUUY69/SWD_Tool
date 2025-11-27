@@ -213,6 +213,7 @@ namespace BLL.Service
 			return extension switch
 			{
 				".zip" => "application/zip",
+				".rar" => "application/x-rar-compressed",
 				".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 				".doc" => "application/msword",
 				".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
